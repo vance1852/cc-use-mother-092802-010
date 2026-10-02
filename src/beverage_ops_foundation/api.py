@@ -8,6 +8,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
+from .benchmark import BenchmarkService
+from .benchmark_api import route_benchmark
 from .errors import DomainError, ValidationError
 from .service import DomainService
 from .storage import Database
@@ -21,6 +23,9 @@ def route(service: DomainService, method: str, path: str, body: dict[str, Any] |
     body = body or {}
     parsed = urlparse(path)
     actor_id = headers.get("X-Actor-Id", "")
+    benchmark_result = route_benchmark(service, method, path, body, headers)
+    if benchmark_result is not None:
+        return benchmark_result
     try:
         if method == "GET" and parsed.path == "/health":
             valid, count = service.verify_audit()
@@ -99,7 +104,7 @@ def main() -> int:
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     database = Database(args.database)
-    Handler.service = DomainService(database)
+    Handler.service = BenchmarkService(database)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     try:
         server.serve_forever()
